@@ -64,8 +64,13 @@ export interface UpdateOptionReplyMessage extends BaseWorkerMessage<'updateOptio
   errors?: CustomDiagnostic[];
 }
 
+export interface ProjectInfo {
+  flags: number;
+  escapedName: string;
+}
+
 export interface ProjectInfoReplyMessage extends BaseWorkerMessage<'info'> {
-  result: any;
+  result: ProjectInfo | undefined;
 }
 
 export type ReplyFromWorker =
@@ -181,16 +186,21 @@ export function getInfo() {
   const program = languageService.getProgram();
   if (!program) return undefined;
 
-  const checker = program.getTypeChecker();
-
   const sourceFile = program.getSourceFile('/main.ts');
-  if (!sourceFile) return undefined;
+  if (!sourceFile) {
+    console.log('Failed to get source file');
+    return undefined;
+  }
 
+  const checker = program.getTypeChecker();
   const sourceFileSymbol = checker.getSymbolAtLocation(sourceFile);
-  if (!sourceFileSymbol) return undefined;
+  if (!sourceFileSymbol) {
+    console.log('Failed to get source file symbol');
+    return undefined;
+  }
 
   return {
-    escapedName: sourceFileSymbol.escapedName,
+    escapedName: sourceFileSymbol.escapedName.toString(),
     flags: sourceFileSymbol.flags,
   };
 }
@@ -206,6 +216,12 @@ export function handler(event: MessageEvent<MessageToWorker>) {
     case 'updateFile': {
       const { fileName, content } = message;
       writeFile(fileName, content);
+
+      const reply2: ProjectInfoReplyMessage = {
+        type: 'info',
+        result: getInfo(),
+      };
+      self.postMessage(reply2);
       break;
     }
     case 'diagnostics': {
@@ -284,6 +300,12 @@ export function handler(event: MessageEvent<MessageToWorker>) {
       };
 
       languageService = getLanguageService(completeOptions);
+
+      const reply2: ProjectInfoReplyMessage = {
+        type: 'info',
+        result: getInfo(),
+      };
+      self.postMessage(reply2);
       break;
     }
     case 'info': {

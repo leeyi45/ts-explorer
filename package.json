@@ -1,6 +1,10 @@
 {
   "name": "ts-explorer",
   "packageManager": "yarn@4.14.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/leeyi45/ts-explorer"
+  },
   "type": "module",
   "devDependencies": {
     "@stylistic/eslint-plugin": "^5.10.0",
@@ -18,7 +22,9 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@monaco-editor/react": "^4.7.0",
+    "@mui/icons-material": "^9.3.1",
     "@mui/material": "^9.3.1",
+    "@mui/x-tree-view": "^9.13.0",
     "es-toolkit": "^1.52.0",
     "monaco-editor": "^0.56.0",
     "react": "^19.3.0",

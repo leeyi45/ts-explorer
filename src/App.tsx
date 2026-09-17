@@ -1,17 +1,37 @@
-import Grid from '@mui/material/Grid';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import { debounce } from 'es-toolkit';
 import * as monaco from 'monaco-editor';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import SymbolDisplay from './Display/SymbolDisplay';
 import Editor from './Editor/Editor';
 import { typescriptWorker } from './Editor/setupMonaco';
-import type { ReplyFromWorker, UpdateFileMessage, UpdateOptionsMessage } from './worker';
+import type { ProjectInfo, ReplyFromWorker, UpdateFileMessage, UpdateOptionsMessage } from './worker';
 
 const updateTsconfig = debounce((rawText: string) => {
+  localStorage.setItem('tsconfigEditor', rawText);
+
   const message: UpdateOptionsMessage = {
     type: 'updateOptions',
     rawOptions: rawText,
   };
   typescriptWorker.postMessage(message);
+}, 200);
+
+const updateCode = debounce((newValue: string) => {
+  localStorage.setItem('codeEditor', newValue);
+
+  const model = monaco.editor.getModel(monaco.Uri.parse('file:///main.ts'));
+  if (!model) return;
+
+  const updateFile: UpdateFileMessage = {
+    type: 'updateFile',
+    fileName: '/main.ts',
+    content: model.getValue()
+  };
+
+  typescriptWorker.postMessage(updateFile);
 }, 200);
 
 const defaultTsconfig = {
@@ -22,6 +42,7 @@ const defaultTsconfig = {
 export default function App() {
   const tsconfigEditorRef = useRef<monaco.editor.IStandaloneCodeEditor>(null);
   const codeEditorRef = useRef<monaco.editor.IStandaloneCodeEditor>(null);
+  const [project, setProject] = useState<ProjectInfo | null>(null);
 
   useEffect(() => {
     function replyHandler({ data }: MessageEvent<ReplyFromWorker>) {
@@ -50,6 +71,11 @@ export default function App() {
               };
             })
           );
+          break;
+        }
+        case 'info': {
+          if (data.result) setProject(data.result);
+          break;
         }
       }
     }
@@ -66,21 +92,10 @@ export default function App() {
       language='typescript'
       ref={codeEditorRef}
       path='file:///main.ts'
+      defaultValue={localStorage.getItem('codeEditor') ?? ''}
       onChange={newValue => {
         if (newValue === undefined) return;
-
-        localStorage.setItem('codeEditor', newValue);
-
-        const model = monaco.editor.getModel(monaco.Uri.parse('file:///main.ts'));
-        if (!model) return;
-
-        const updateFile: UpdateFileMessage = {
-          type: 'updateFile',
-          fileName: model.uri.toString(),
-          content: model.getValue()
-        };
-
-        typescriptWorker.postMessage(updateFile);
+        updateCode(newValue);
       }}
     />
   );
@@ -89,7 +104,7 @@ export default function App() {
     <Editor
       ref={tsconfigEditorRef}
       defaultValue={
-        localStorage.getItem('jsonEditor') ?? JSON.stringify(defaultTsconfig, null, 2)
+        localStorage.getItem('tsconfigEditor') ?? JSON.stringify(defaultTsconfig, null, 2)
       }
       language='json'
       path='file:///tsconfig.json'
@@ -97,19 +112,27 @@ export default function App() {
         if (newValue === undefined) return;
 
         updateTsconfig(newValue);
-        localStorage.setItem('jsonEditor', newValue);
       }}
     />
   );
 
-  return <Grid
-    container
-    rowSpacing={1}
-    sx={{ height: '100vh' }}
-  >
-    <Grid size={12}></Grid>
-    <Grid size={6}>{codeEditor}</Grid>
-    <Grid size={6} />
-    <Grid size={6}>{tsconfigEditor}</Grid>
-  </Grid>;
+  return <div style={{ padding: '5px' }}>
+    <Stack direction='row' sx={{ height: '100vh' }} spacing={1}>
+      <Stack direction="column" sx={{ width: '50vw' }}>
+        <Stack direction="column" sx={{ height: '70vh' }}>
+          <Typography>Code Editor</Typography>
+          {codeEditor}
+        </Stack>
+        <Stack direction="column" sx={{ height: '30vh' }}>
+          <Typography>tsconfig Editor</Typography>
+          {tsconfigEditor}
+        </Stack>
+      </Stack>
+      <Paper sx={{ width: '50vw' }}>
+        <div style={{ padding: '5px' }}>
+          <SymbolDisplay name="Test" flags={project?.flags ?? 0} escapedName={project?.escapedName ?? ''} />
+        </div>
+      </Paper>
+    </Stack>
+  </div>;
 }
